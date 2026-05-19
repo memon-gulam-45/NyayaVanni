@@ -81,7 +81,6 @@ export default function Dashboard() {
         body: JSON.stringify({
           user_message: userMsg.message,
           chat_history: chatHistory,
-          document_analysis: analysis,
           language: language
         })
       });

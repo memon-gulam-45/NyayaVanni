@@ -92,19 +92,29 @@ async def analyze_document(document_id: str, language: str = "en", file: UploadF
         raise HTTPException(status_code=500, detail="An internal processing error occurred.")
 
 
+@api_router.post("/chat/general", response_model=ChatResponse)
+async def chat_general(request: ChatRequest):
+    """General legal chat — no document context."""
+    try:
+        history = [{"role": msg.role, "message": msg.message} for msg in request.chat_history]
+        text = generate_chat_response({}, history, request.user_message, request.language)
+        return ChatResponse(response=text)
+    except Exception as e:
+        logger.error(f"General chat failed: {e}")
+        raise HTTPException(status_code=500, detail="Chat generation failed")
+
+
 @api_router.post("/chat/{document_id}", response_model=ChatResponse)
 async def chat_with_document(document_id: str, request: ChatRequest):
-    """Send chat message with context"""
+    """Send chat message with document context loaded server-side."""
     try:
-        # In full production, fetch analysis and history from DynamoDB
-        analysis = request.document_analysis or {}
-        
-        # Format history
+        cached = get_cached_analysis(document_id, request.language)
+        analysis = cached["analysis"] if cached else {}
+
         history = [{"role": msg.role, "message": msg.message} for msg in request.chat_history]
-        
         response_text = generate_chat_response(analysis, history, request.user_message, request.language)
-        
+
         return ChatResponse(response=response_text)
     except Exception as e:
-        logger.error(f"Chat failed: {e}")
+        logger.error(f"Chat failed for document {document_id}: {e}")
         raise HTTPException(status_code=500, detail="Chat generation failed")
